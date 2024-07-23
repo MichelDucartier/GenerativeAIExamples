@@ -28,26 +28,34 @@ class NvidiaLLM:
 
 class LocalLLM:
     def __init__(self, model_path):
-        tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
-        model = AutoModelForCausalLM.from_pretrained(
-            model_path, 
-            torch_dtype=torch.float16,
-            trust_remote_code=True,
-            device_map="auto"
-            )
+        # tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+        # model = AutoModelForCausalLM.from_pretrained(
+        #     model_path, 
+        #     torch_dtype=torch.float16,
+        #     trust_remote_code=True,
+        #     device_map="auto"
+        # )
 
-        pipe = pipeline(
-            "text-generation",
-            model=model,
-            tokenizer=tokenizer,
-            max_length=1024,
-            temperature=0.6,
-            top_p=0.3,
-            repetition_penalty=1.0
+        # pipe = pipeline(
+        #     "text-generation",
+        #     model=model,
+        #     tokenizer=tokenizer,
+        #     max_length=1024,
+        #     temperature=0.6,
+        #     top_p=0.3,
+        #     repetition_penalty=1.0
+        # )
+
+        # self.llm = HuggingFacePipeline(pipeline=pipe)
+
+        self.llm = HuggingFacePipeline.from_model_id(
+            model_id=model_path,
+            task="text-generation",
+            model_kwargs={"load_in_8bit": True},
+            pipeline_kwargs={"max_new_tokens": 512},
+            device=0
         )
-
-        self.llm = HuggingFacePipeline(pipeline=pipe)
-
+        
 
 def create_llm(model_name, model_type="NVIDIA"):
     # Use LLM to generate answer

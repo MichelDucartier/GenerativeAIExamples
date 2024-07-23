@@ -30,6 +30,8 @@ from bot_config.utils import get_config
 from utils.memory import init_memory, get_summary, add_history_to_memory
 from guardrails.fact_check import fact_check
 from llm.llm_client import LLMClient
+from llm.llava_client import LlavaClient
+from llm.llama_client import LlamaClient
 from retriever.embedder import NVIDIAEmbedders, HuggingFaceEmbeders
 from retriever.vector import MilvusVectorClient, QdrantClient
 from retriever.retriever import Retriever
@@ -38,7 +40,7 @@ from utils.feedback import feedback_kwargs
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
 from langchain_core.messages import HumanMessage
 
-llm_client = LLMClient("mixtral_8x7b")
+llm_client = LLMClient("/mloscratch/homes/miczhang/meditron-llama3/models/OpenMeditron-8B", model_type="LOCAL")
 
 # Start the analytics service (using browser.usageStats)
 streamlit_analytics.start_tracking()
@@ -122,14 +124,16 @@ with st.sidebar:
         with open(st.session_state.image_query,"wb") as f:
             f.write(uploaded_file.read())
     
-        with st.spinner("Getting image description using NeVA"):
-            neva = LLMClient("neva_22b")
+        with st.spinner("Getting image description using Llava"):
+            # neva = LLMClient("neva_22b")
             image = Image.open(st.session_state.image_query).convert("RGB")
-            buffered = BytesIO()
-            image.save(buffered, format="JPEG", quality=20) # Quality = 20 is a workaround (WAR)
-            b64_string = base64.b64encode(buffered.getvalue()).decode("utf-8")
-            res = neva.multimodal_invoke(b64_string, creativity = 0, quality = 9, complexity = 0, verbosity = 9)
-            st.session_state.image_query = res.content
+            # buffered = BytesIO()
+            # image.save(buffered, format="JPEG", quality=20) # Quality = 20 is a workaround (WAR)
+            # b64_string = base64.b64encode(buffered.getvalue()).decode("utf-8")
+            # res = neva.multimodal_invoke(b64_string, creativity = 0, quality = 9, complexity = 0, verbosity = 9)
+            # st.session_state.image_query = res.content
+            llava_model = LlavaClient("/mloscratch/homes/miczhang/multimodal/multimodal_models/llava-llama-8b-pretrain-batched")
+            st.session_state.image_query = llava_model.multimodal_invoke("Give a description of the image: <image>", image)
     
     if not uploaded_file:
         st.session_state.image_query = ""
@@ -147,7 +151,8 @@ if "vector_client" not in st.session_state or st.session_state.vector_client.col
         st.stop()
 # init the embedder
 if "query_embedder" not in st.session_state:
-    st.session_state.query_embedder = NVIDIAEmbedders(name="ai-embed-qa-4", type="query")
+    # st.session_state.query_embedder = NVIDIAEmbedders(name="ai-embed-qa-4", type="query")
+    st.session_state.query_embedder = HuggingFaceEmbeders(name="/mloscratch/homes/miczhang/meditron-llama3/models/OpenMeditron-8B")
 # init the retriever
 if "retriever" not in st.session_state:
     st.session_state.retriever = Retriever(embedder=st.session_state.query_embedder , vector_client=st.session_state.vector_client)
@@ -267,13 +272,14 @@ if len(prompt) > 0 and submitted == True:
         message_placeholder.markdown(full_response)
 
     add_history_to_memory(memory, transformed_query["text"], full_response)
-    with st.spinner("Running fact checking/guardrails..."):
-        full_response += "\n\nFact Check result: " 
-        res = fact_check(context, transformed_query["text"], full_response)
-        for response in res:
-            full_response += response
-            message_placeholder.markdown(full_response + "▌")
-        message_placeholder.markdown(full_response)
+    
+    # with st.spinner("Running fact checking/guardrails..."):
+    #     full_response += "\n\nFact Check result: " 
+    #     res = fact_check(context, transformed_query["text"], full_response)
+    #     for response in res:
+    #         full_response += response
+    #         message_placeholder.markdown(full_response + "▌")
+    #     message_placeholder.markdown(full_response)
     
     with st.chat_message("assistant"):
         messages.append(

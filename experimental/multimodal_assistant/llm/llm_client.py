@@ -17,14 +17,43 @@ from llm.llm import create_llm
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import HumanMessage
+from langchain_core.runnables import RunnableLambda
+
+from transformers import AutoTokenizer
+
+
+def build_messages(system_prompt):
+    def helper(prompt):
+        messages = [
+            {
+                "role": "system",
+                "content": system_prompt,
+            }, 
+            {
+                "role": "user", 
+                "content": prompt
+            },
+        ]
+        
+        return messages
+
+    return helper
+
 
 class LLMClient:
     def __init__(self, model_name="mixtral_8x7b", model_type="NVIDIA"):
         self.llm = create_llm(model_name, model_type)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
     def chat_with_prompt(self, system_prompt, prompt):
-        langchain_prompt = ChatPromptTemplate.from_messages([("system", system_prompt), ("user", "{input}")])
-        chain = langchain_prompt | self.llm | StrOutputParser()
+        # langchain_prompt = ChatPromptTemplate.from_messages([("system", system_prompt), ("user", "{input}")], template_format="jinja2")
+        langchain_prompt = ChatPromptTemplate.from_template(template=self.tokenizer.chat_template, template_format="jinja2")
+        
+        preprocess = {"bos_token": RunnableLambda(lambda _: self.tokenizer.bos_token), 
+        "add_generation_prompt": RunnableLambda(lambda _: True), 
+        "messages": RunnableLambda(build_messages(system_prompt))}
+        
+        chain = preprocess | langchain_prompt | self.llm | StrOutputParser()
         response = chain.stream({"input": prompt})
 
         return response

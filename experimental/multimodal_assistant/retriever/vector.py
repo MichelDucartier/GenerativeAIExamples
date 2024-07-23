@@ -19,7 +19,9 @@ import os
 
 from pydantic import BaseModel
 from qdrant_client import QdrantClient
-from pymilvus import connections, Collection, FieldSchema, CollectionSchema, DataType, utility
+from milvus import default_server
+from pymilvus import connections, Collection, FieldSchema, CollectionSchema, DataType, utility, MilvusClient
+
 from qdrant_client.http.models import PointStruct, VectorParams, Distance
 
 class VectorClient(ABC, BaseModel):
@@ -62,6 +64,7 @@ class MilvusVectorClient(VectorClient):
         self.vector_db.load()
 
     def _create_index(self, metric_type, index_type, field_name, nlist=100):
+        # index_params = self.vector_db.prepare_index_params()
 
         index_params = {
             "metric_type": metric_type,  # or "IP" depending on your requirement
@@ -77,11 +80,13 @@ class MilvusVectorClient(VectorClient):
             return vector_db
         except:
             # create the vector DB using default embedding dimensions of 1024
-            vector_db = self.create_collection(collection_name, embedding_size=1024)
+            self.create_collection(collection_name, embedding_size=1024)
             return self.vector_db
 
     def disconnect(self, alias="default"):
         connections.disconnect(alias)
+        default_server.stop()
+
 
     def search(self, query_vectors, limit=5):
         search_params = {
